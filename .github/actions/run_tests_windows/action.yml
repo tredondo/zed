@@ -23,5 +23,8 @@ runs:
     - name: Run tests
       shell: powershell
       working-directory: ${{ inputs.working-directory }}
+      env:
+        RUST_LOG: project=debug # FIXME
+      # FIXME
       run: |
-        cargo nextest run --workspace --no-fail-fast
+        cargo nextest run -p project_panel --no-fail-fast  --failure-output immediate-final
