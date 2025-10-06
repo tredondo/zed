@@ -3536,7 +3536,26 @@ impl SettingsWindow {
             .size_full()
             .gap_4()
             .overflow_y_scroll()
-            .track_scroll(&self.scroll_handle);
+            .track_scroll(&self.scroll_handle)
+            .on_scroll_wheel(cx.listener(move |this, _, _, _| {
+                let scroll_index = this.scroll_handle.logical_scroll_top().0;
+
+                let mut page_index = this.navbar_entry;
+
+                while !this.navbar_entries[page_index].is_root {
+                    page_index -= 1;
+                }
+
+                if this.navbar_entries[page_index].expanded {
+                    let section_index = this
+                        .page_items()
+                        .take(scroll_index + 1)
+                        .filter(|item| matches!(item, SettingsPageItem::SectionHeader(_)))
+                        .count();
+
+                    this.navbar_entry = section_index + page_index;
+                }
+            }));
 
         if self.sub_page_stack.len() == 0 {
             page = page.child(self.render_files(window, cx));
