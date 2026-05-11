@@ -3,9 +3,9 @@ use collections::{HashMap, HashSet};
 use editor::SelectionEffects;
 use editor::{CurrentLineHighlight, Editor, EditorElement, EditorEvent, EditorStyle, actions::Tab};
 use gpui::{
-    App, Bounds, DEFAULT_ADDITIONAL_WINDOW_SIZE, Entity, EventEmitter, Focusable, PromptLevel,
-    Subscription, Task, TaskExt, TextStyle, Tiling, TitlebarOptions, WindowBounds, WindowHandle,
-    WindowOptions, actions, point, size, transparent_black,
+    App, Bounds, DEFAULT_ADDITIONAL_WINDOW_SIZE, DismissEvent, Entity, EventEmitter, Focusable,
+    PromptLevel, Subscription, Task, TaskExt, TextStyle, Tiling, TitlebarOptions, WindowBounds,
+    WindowHandle, WindowOptions, actions, point, size, transparent_black,
 };
 use language::{Buffer, LanguageRegistry, language_settings::SoftWrap};
 use language_model::{ConfiguredModel, LanguageModelRegistry};
@@ -497,6 +497,17 @@ impl RulesLibrary {
             picker
         });
 
+        let _picker_event_subscription =
+            cx.subscribe_in(&picker, window, Self::handle_picker_event);
+        // Close the Rules Library window when the picker is dismissed (e.g.
+        // by pressing Esc while focus is in the picker). Without this, the
+        // picker emits `DismissEvent` and nobody listens, so the window
+        // stays open. See https://github.com/zed-industries/zed/issues/56083.
+        let _picker_dismiss_subscription =
+            cx.subscribe_in(&picker, window, |_, _, _: &DismissEvent, window, _| {
+                window.remove_window();
+            });
+
         Self {
             title_bar: if !cfg!(target_os = "macos") {
                 Some(cx.new(|cx| PlatformTitleBar::new("rules-library-title-bar", cx)))
@@ -509,7 +520,7 @@ impl RulesLibrary {
             active_rule_id: None,
             pending_load: Task::ready(()),
             inline_assist_delegate,
-            _subscriptions: vec![cx.subscribe_in(&picker, window, Self::handle_picker_event)],
+            _subscriptions: vec![_picker_event_subscription, _picker_dismiss_subscription],
             picker,
         }
     }
@@ -1133,6 +1144,7 @@ impl RulesLibrary {
                 })
             })
             .on_action(cx.listener(Self::move_down_from_title))
+            .on_action(cx.listener(Self::focus_picker))
             .child(EditorElement::new(
                 &editor,
                 EditorStyle {
